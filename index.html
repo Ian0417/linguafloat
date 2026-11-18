@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131b">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>LinguaFloat 即时双语字幕</title>
+<style>
+:root{color-scheme:dark;--bg:#10131b;--panel:#1a2030;--muted:#aab4c7;--accent:#86a8ff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f5f7fb;font:16px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:env(safe-area-inset-top) 16px env(safe-area-inset-bottom)}
+main{max-width:680px;margin:0 auto;padding:22px 0 34px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px}h1{font-size:23px;margin:0} .tag{font-size:12px;color:#b9c8ff;border:1px solid #3b4c78;padding:5px 9px;border-radius:20px}
+p.sub{color:var(--muted);font-size:13px;line-height:1.5;margin:10px 0 20px}
+.card{background:var(--panel);border:1px solid #2a3449;border-radius:18px;padding:16px;margin:12px 0}
+label{display:block;color:#c6cede;font-size:13px;margin:0 0 7px}select,button{font:inherit;border-radius:12px;border:1px solid #39445b;background:#111725;color:#fff;padding:12px;width:100%}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+button.primary{background:#456bd2;border-color:#456bd2;font-weight:650}button.stop{background:#38232a;border-color:#74404b}button:disabled{opacity:.45}
+.status{font-size:13px;color:#b9c8ff;margin-top:12px;min-height:20px}
+.caption{min-height:170px}.caption small{color:#9eabc2;letter-spacing:.04em}.original{font-size:19px;line-height:1.5;margin:10px 0 12px;white-space:pre-wrap;overflow-wrap:anywhere}.translated{font-size:21px;line-height:1.5;font-weight:650;white-space:pre-wrap;overflow-wrap:anywhere}.placeholder{color:#748198;font-size:15px;font-weight:400}
+.tools{display:flex;align-items:center;gap:12px}.tools input{width:100%;accent-color:var(--accent)}.tools span{white-space:nowrap;color:#c6cede;font-size:13px}
+.note{font-size:12px;line-height:1.55;color:#9ba8bd}
+footer{color:#7e8ba2;font-size:11px;line-height:1.5;margin:18px 3px}
+</style>
+</head>
+<body>
+<main>
+ <div class="top"><h1>LinguaFloat</h1><span class="tag">双语实时字幕 · 测试版</span></div>
+ <p class="sub">将 iPhone 放在播放声音的设备旁边，允许麦克风权限。识别日语、英语或韩语，并翻译成简体中文。</p>
+ <section class="card">
+  <div class="grid">
+   <div><label for="source">语音语言</label><select id="source"><option value="ja-JP">日语</option><option value="en-US">英语</option><option value="ko-KR">韩语</option></select></div>
+   <div><label for="target">翻译语言</label><select id="target"><option value="zh-CN">简体中文</option></select></div>
+  </div>
+  <div class="actions"><button class="primary" id="start">开始识别</button><button class="stop" id="stop" disabled>停止</button></div>
+  <div class="status" id="status" role="status">准备就绪。请先选择视频语音语言。</div>
+ </section>
+ <section class="card caption">
+  <small>原文 · ORIGINAL</small>
+  <div class="original placeholder" id="original">识别到的语音会显示在这里…</div>
+  <small>简体中文 · TRANSLATION</small>
+  <div class="translated placeholder" id="translated">中文翻译会显示在这里…</div>
+ </section>
+ <section class="card">
+  <label for="size">字幕大小</label>
+  <div class="tools"><span>小</span><input id="size" type="range" min="16" max="32" value="21"><span>大</span></div>
+  <div class="actions"><button id="clear">清空字幕</button><button id="copy">复制字幕</button></div>
+ </section>
+ <section class="card">
+  <div class="note"><b>使用方式</b><br>1. 在 Safari 打开本页面并允许麦克风。<br>2. 选择视频语言，点击「开始识别」。<br>3. 在 YouTube 或其他设备播放视频，让 iPhone 麦克风听到声音。<br><br><b>重要限制</b><br>这是网页原型，不是系统级悬浮窗。iOS 通常会在切换到 YouTube 或锁屏后暂停网页麦克风/语音识别，因此不能保证边看 YouTube 官方 App 边持续翻译。若要同一台 iPhone 跨 App 捕获 YouTube 音频，需要原生 iOS 屏幕广播扩展及真机测试；网页无法绕过该限制。语音识别能力取决于 iOS/Safari 版本与网络。</div>
+ </section>
+ <footer>测试版。语音识别由浏览器提供；文本翻译请求发送至 MyMemory 公共翻译服务。请勿用于敏感或私人对话。翻译质量及服务额度不作保证。</footer>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recognition=null, running=false, finalText="", lastTranslated="";
+function setStatus(s){$("status").textContent=s}
+function showOriginal(s){$("original").textContent=s;$("original").classList.remove("placeholder")}
+function showTranslation(s){$("translated").textContent=s;$("translated").classList.remove("placeholder")}
+async function translate(text){
+  if(!text.trim()||text===lastTranslated)return;
+  lastTranslated=text;
+  try{
+    const lang=$("source").value;
+    const pair=lang.startsWith("ja")?"ja|zh-CN":lang.startsWith("ko")?"ko|zh-CN":"en|zh-CN";
+    const url="https://api.mymemory.translated.net/get?q="+encodeURIComponent(text.slice(-450))+"&langpair="+encodeURIComponent(pair);
+    const res=await fetch(url); if(!res.ok)throw new Error("翻译服务暂不可用");
+    const data=await res.json();
+    const result=data?.responseData?.translatedText;
+    if(result)showTranslation(decodeEntities(result));else throw new Error("没有取得翻译结果");
+  }catch(e){setStatus("翻译暂时失败："+e.message)}
+}
+function decodeEntities(s){const t=document.createElement("textarea");t.innerHTML=s;return t.value}
+$("start").addEventListener("click",()=>{
+ if(!SpeechRecognition){setStatus("当前 Safari 不支持网页语音识别。请更新 iOS/Safari，或改用原生 App 方案。");return}
+ if(running)return;
+ recognition=new SpeechRecognition();
+ recognition.lang=$("source").value;
+ recognition.continuous=true;
+ recognition.interimResults=true;
+ recognition.onstart=()=>{running=true;$("start").disabled=true;$("stop").disabled=false;setStatus("正在聆听…请让麦克风听到视频声音。")};
+ recognition.onresult=async ev=>{
+  let interim="", committed="";
+  for(let i=ev.resultIndex;i<ev.results.length;i++){
+   const part=ev.results[i][0].transcript;
+   if(ev.results[i].isFinal)committed+=part;else interim+=part;
+  }
+  const display=(finalText+" "+committed+" "+interim).trim();
+  if(display)showOriginal(display);
+  if(committed){finalText=(finalText+" "+committed).trim(); await translate(committed)}
+ };
+ recognition.onerror=e=>{setStatus("识别错误："+e.error+"。检查麦克风权限和网络。")};
+ recognition.onend=()=>{running=false;$("start").disabled=false;$("stop").disabled=true;if($("status").textContent.startsWith("正在聆听"))setStatus("识别已暂停。可再次点击开始。")};
+ try{recognition.start()}catch(e){setStatus("无法启动："+e.message)}
+});
+$("stop").addEventListener("click",()=>{if(recognition&&running)recognition.stop()});
+$("clear").addEventListener("click",()=>{finalText="";lastTranslated="";$("original").textContent="识别到的语音会显示在这里…";$("translated").textContent="中文翻译会显示在这里…";$("original").classList.add("placeholder");$("translated").classList.add("placeholder");setStatus("字幕已清空。")});
+$("copy").addEventListener("click",async()=>{const text="原文："+$("original").textContent+"\n中文："+$("translated").textContent;try{await navigator.clipboard.writeText(text);setStatus("字幕已复制。")}catch(e){setStatus("复制失败，请手动选择文字。")}});
+$("size").addEventListener("input",e=>{$("translated").style.fontSize=e.target.value+"px";$("original").style.fontSize=Math.max(14,e.target.value-2)+"px"});
+if("serviceWorker" in navigator && location.protocol.startsWith("http"))navigator.serviceWorker.register("./sw.js").catch(()=>{});
+</script>
+</body></html>

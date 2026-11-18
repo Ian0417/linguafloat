@@ -1,0 +1,16 @@
+{
+  "name": "LinguaFloat 即时双语字幕",
+  "short_name": "LinguaFloat",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#10131b",
+  "theme_color": "#10131b",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
